@@ -262,7 +262,7 @@ def _find_lineage_for_domains_and_certname(config, domains, certname):
                 return "newcert", None
             else:
                 raise errors.ConfigurationError("No certificate with name {0} found. "
-                    "Use -d to specify domains, or run certbot --certificates to see "
+                    "Use -d to specify domains, or run 'certbot certificates' to see "
                     "possible certificate names.".format(certname))
 
 def _ask_user_to_confirm_new_names(config, new_domains, certname, old_domains):
@@ -699,7 +699,9 @@ def setup_logging(config):
     root_logger.addHandler(file_handler)
 
     logger.debug("Root logging level set at %d", level)
-    logger.info("Saving debug log to %s", log_file_path)
+    # We only want log message to stdout if not producing machine readable output
+    if not config.json:
+        logger.info("Saving debug log to %s", log_file_path)
 
 
 def _handle_exception(exc_type, exc_value, trace, config):

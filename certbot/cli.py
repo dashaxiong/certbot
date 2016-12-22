@@ -835,7 +835,7 @@ def prepare_and_parse_args(plugins, args, detect_defaults=False):  # pylint: dis
         "--cert-name", dest="certname",
         metavar="CERTNAME", default=None,
         help="Certificate name to apply. Only one certificate name can be used "
-             "per Certbot run. To see certificate names, run 'certbot certificates'. "
+             "per Certbot run. To see certificate names, run `certbot certificates`. "
              "When creating a new certificate, specifies the new certificate's name.")
     helpful.add(
         ["rename", "manage"],
@@ -1071,6 +1071,8 @@ def _create_subparsers(helpful):
                 "--csr", type=read_file,
                 help="Path to a Certificate Signing Request (CSR) in DER or PEM format."
                 " Currently --csr only works with the 'certonly' subcommand.")
+    helpful.add("certificates",
+                "--json", action="store_true", default=False, help="Use json format.")
     helpful.add("rollback",
                 "--checkpoints", type=int, metavar="N",
                 default=flag_default("rollback_checkpoints"),

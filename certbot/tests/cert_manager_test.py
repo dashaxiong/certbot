@@ -216,6 +216,37 @@ class CertificatesTest(BaseCertManagerTest):
         out = cert_manager._report_human_readable(parsed_certs)
         self.assertTrue('INVALID: TEST CERT' in out)
 
+    def test_report_json(self):
+        from certbot import cert_manager
+        import json
+        import datetime, pytz
+        expiry = pytz.UTC.fromutc(datetime.datetime.utcnow())
+
+
+        class MockCert(object):
+            """A mock class that can be json serialized. """
+            def __init__(self, lineagename, domains, expiry, fullchain, privkey):
+                self.lineagename = lineagename
+                self.names = lambda: domains
+                self.target_expiry = expiry
+                self.fullchain = fullchain
+                self.privkey = privkey
+                self.is_test_cert = True
+
+
+        cert = MockCert("nameone", ["nameone", "nametwo"], expiry,
+                "/path/fullchain", "/path/privkey")
+        parsed_certs = [cert]
+        # pylint: disable=protected-access
+        out = cert_manager._report_json(parsed_certs)
+
+        try:
+            certs_json = json.loads(out)
+        except ValueError as e:
+            self.fail(e)
+
+        self.assertTrue(len(certs_json) == 1)
+
 
 class SearchLineagesTest(BaseCertManagerTest):
     """Tests for certbot.cert_manager._search_lineages."""

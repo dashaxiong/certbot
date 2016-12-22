@@ -64,7 +64,7 @@ class FileDisplay(object):
         self.skipped_interaction = False
 
     def notification(self, message, pause=True,
-                     wrap=True, force_interactive=False):
+                     wrap=True, force_interactive=False, fmt="human_readable"):
         """Displays a notification and waits for user acceptance.
 
         :param str message: Message to display
@@ -78,9 +78,12 @@ class FileDisplay(object):
         side_frame = "-" * 79
         if wrap:
             message = _wrap_lines(message)
-        self.outfile.write(
-            "{line}{frame}{line}{msg}{line}{frame}{line}".format(
-                line=os.linesep, frame=side_frame, msg=message))
+        if fmt == "human_readable":
+            self.outfile.write(
+                "{line}{frame}{line}{msg}{line}{frame}{line}".format(
+                    line=os.linesep, frame=side_frame, msg=message))
+        elif fmt == "json" or fmt == "grep":
+            self.outfile.write(message + "\n")
         if pause:
             if self._can_interact(force_interactive):
                 six.moves.input("Press Enter to Continue")
@@ -420,21 +423,26 @@ class NoninteractiveDisplay(object):
             msg += "\n\n(You can set this with the {0} flag)".format(cli_flag)
         raise errors.MissingCommandlineFlag(msg)
 
-    def notification(self, message, pause=False, wrap=True, **unused_kwargs):
+    def notification(self, message, pause=False, wrap=True, fmt="human_readable"):
         # pylint: disable=unused-argument
         """Displays a notification without waiting for user acceptance.
 
         :param str message: Message to display to stdout
         :param bool pause: The NoninteractiveDisplay waits for no keyboard
         :param bool wrap: Whether or not the application should wrap text
+        :param str fmt: Specify human_readable, json or grep output format
 
         """
+
         side_frame = "-" * 79
         if wrap:
             message = _wrap_lines(message)
-        self.outfile.write(
-            "{line}{frame}{line}{msg}{line}{frame}{line}".format(
-                line=os.linesep, frame=side_frame, msg=message))
+        if fmt == "human_readable":
+            self.outfile.write(
+                "{line}{frame}{line}{msg}{line}{frame}{line}".format(
+                    line=os.linesep, frame=side_frame, msg=message))
+        elif fmt == "json" or fmt == "grep":
+            self.outfile.write(message + "\n")
 
     def menu(self, message, choices, ok_label=None, cancel_label=None,
              help_label=None, default=None, cli_flag=None, *unused_kwargs):
