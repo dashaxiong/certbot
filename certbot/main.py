@@ -804,6 +804,10 @@ def set_displayer(config):
     else:
         displayer = display_util.FileDisplay(sys.stdout,
                                              config.force_interactive)
+
+    if config.json:
+        displayer = display_util.MachineReadableDisplay(sys.stdout)
+
     zope.component.provideUtility(displayer)
 
 
