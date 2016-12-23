@@ -364,8 +364,7 @@ class IDisplay(zope.interface.Interface):
     # pylint: disable=too-many-arguments
     # see https://github.com/certbot/certbot/issues/3915
 
-    def notification(message, pause, wrap=True, force_interactive=False,
-            fmt="human_readable"):
+    def notification(message, pause, wrap=True, force_interactive=False):
         """Displays a string message
 
         :param str message: Message to display
@@ -374,7 +373,6 @@ class IDisplay(zope.interface.Interface):
         :param bool wrap: Whether or not the application should wrap text
         :param bool force_interactive: True if it's safe to prompt the user
             because it won't cause any workflow regressions
-        :param str fmt: Specify human_readable, json, or grep format
 
         """
 

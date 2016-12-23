@@ -708,9 +708,7 @@ def setup_logging(config):
     root_logger.addHandler(file_handler)
 
     logger.debug("Root logging level set at %d", level)
-    # We only want log message to stdout if not producing machine readable output
-    if not config.json:
-        logger.info("Saving debug log to %s", log_file_path)
+    logger.info("Saving debug log to %s", log_file_path)
 
 
 def _handle_exception(exc_type, exc_value, trace, config):

@@ -64,7 +64,7 @@ class FileDisplay(object):
         self.skipped_interaction = False
 
     def notification(self, message, pause=True,
-                     wrap=True, force_interactive=False, fmt="human_readable"):
+                     wrap=True, force_interactive=False):
         """Displays a notification and waits for user acceptance.
 
         :param str message: Message to display
@@ -424,14 +424,13 @@ class NoninteractiveDisplay(object):
             msg += "\n\n(You can set this with the {0} flag)".format(cli_flag)
         raise errors.MissingCommandlineFlag(msg)
 
-    def notification(self, message, pause=False, wrap=True, fmt="human_readable"):
+    def notification(self, message, pause=False, wrap=True):
         # pylint: disable=unused-argument
         """Displays a notification without waiting for user acceptance.
 
         :param str message: Message to display to stdout
         :param bool pause: The NoninteractiveDisplay waits for no keyboard
         :param bool wrap: Whether or not the application should wrap text
-        :param str fmt: Specify human_readable, json or grep output format
 
         """
 
@@ -552,7 +551,7 @@ class MachineReadableDisplay(NoninteractiveDisplay):
         super(MachineReadableDisplay, self).__init__(outfile)
 
     def notification(self, message, **unused_kwargs):
-        """Displays output for consumption by another program. 
+        """Displays output for consumption by another program.
         :param str message: Message to display to stdout
         """
         self.outfile.write(message + "\n")

@@ -79,12 +79,21 @@ def certificates(config):
             logger.debug("Traceback was:\n%s", traceback.format_exc())
             parse_failures.append(renewal_file)
 
-    fmt = "human_readable"
     if config.json is True:
-        fmt = "json"
+        style = "json"
+    #elif config.grep is True:
+    #    style = "grep"
+    else:
+        style = "human_readable"
+
+    output_in = {
+        "human_readable": _describe_certs_human_readable,
+        "json": _describe_certs_json,
+        #"grep": _describe_certs_grep
+    }
 
     # Describe all the certs
-    _describe_certs(parsed_certs, parse_failures, fmt)
+    output_in[style](parsed_certs, parse_failures)
 
 def delete(config):
     """Delete Certbot files associated with a certificate lineage."""
@@ -165,6 +174,23 @@ def _get_certname(config, verb):
         certname = choices[index]
     return certname
 
+def _cert_validity(cert):
+    now = pytz.UTC.fromutc(datetime.datetime.utcnow())
+    if cert.is_test_cert:
+        expiration_text = "INVALID: TEST CERT"
+    elif cert.target_expiry <= now:
+        expiration_text = "INVALID: EXPIRED"
+    else:
+        diff = cert.target_expiry - now
+        if diff.days == 1:
+            expiration_text = "VALID: 1 day"
+        elif diff.days < 1:
+            expiration_text = "VALID: {0} hour(s)".format(diff.seconds // 3600)
+        else:
+            expiration_text = "VALID: {0} days".format(diff.days)
+    valid_string = "{0} ({1})".format(cert.target_expiry, expiration_text)
+    return valid_string
+
 def _report_lines(msgs):
     """Format a results report for a category of single-line renewal outcomes"""
     return "  " + "\n  ".join(str(msg) for msg in msgs)
@@ -173,20 +199,7 @@ def _report_human_readable(parsed_certs):
     """Format a results report for a parsed cert"""
     certinfo = []
     for cert in parsed_certs:
-        now = pytz.UTC.fromutc(datetime.datetime.utcnow())
-        if cert.is_test_cert:
-            expiration_text = "INVALID: TEST CERT"
-        elif cert.target_expiry <= now:
-            expiration_text = "INVALID: EXPIRED"
-        else:
-            diff = cert.target_expiry - now
-            if diff.days == 1:
-                expiration_text = "VALID: 1 day"
-            elif diff.days < 1:
-                expiration_text = "VALID: {0} hour(s)".format(diff.seconds // 3600)
-            else:
-                expiration_text = "VALID: {0} days".format(diff.days)
-        valid_string = "{0} ({1})".format(cert.target_expiry, expiration_text)
+        valid_string = _cert_validity(cert)
         certinfo.append("  Certificate Name: {0}\n"
                         "    Domains: {1}\n"
                         "    Expiry Date: {2}\n"
@@ -199,64 +212,62 @@ def _report_human_readable(parsed_certs):
                             cert.privkey))
     return "Found the following certs:\n".join(certinfo)
 
+def _report_failures_json(paths):
+    """Format a json report of problem conf files. """
+    report = []
+    for path in paths:
+        report.append({
+            "invalid_conf_file": path
+        })
+    return {"failures": report}
+
 def _report_json(parsed_certs):
-    import json
-
-    def to_json(cert):
-        """Returns json object for output. """
-        now = pytz.UTC.fromutc(datetime.datetime.utcnow())
-        if cert.is_test_cert:
-            expiration_text = "INVALID: TEST CERT"
-        elif cert.target_expiry <= now:
-            expiration_text = "INVALID: EXPIRED"
-        else:
-            diff = cert.target_expiry - now
-            if diff.days == 1:
-                expiration_text = "VALID: 1 day"
-            elif diff.days < 1:
-                expiration_text = "VALID: {0} hour(s)".format(diff.seconds // 3600)
-            else:
-                expiration_text = "VALID: {0} days".format(diff.days)
-        valid_string = "{0} ({1})".format(cert.target_expiry, expiration_text)
-        cert_info = {
-            "Certificate Name": cert.lineagename,
-            "Domains": cert.names(),
-            "Expiry Date": valid_string,
-            "Certificate Path": cert.fullchain,
-            "Private Key Path": cert.privkey}
-
-        return cert_info
-
     certs = []
     for cert in parsed_certs:
-        certs.append(to_json(cert))
-    return json.dumps(certs, indent=4)
+        valid_string = _cert_validity(cert)
+        certs.append({
+            "certificate_name": cert.lineagename,
+            "domains": cert.names(),
+            "expiry_date": valid_string,
+            "certificate_path": cert.fullchain,
+            "private_key_path": cert.privkey})
+    return {"found": certs}
 
-def _describe_certs(parsed_certs, parse_failures, fmt="human_readable"):
+def _describe_certs_human_readable(parsed_certs, parse_failures):
     """Print information about the certs we know about"""
     out = []
-
     notify = out.append
-
-    output_format = {
-        "human_readable": _report_human_readable,
-        "json": _report_json,
-        #"grep": _report_grep
-        }
 
     if not parsed_certs and not parse_failures:
         notify("No certs found.")
     else:
         if parsed_certs:
-            notify(output_format[fmt](parsed_certs))
+            notify(_report_human_readable(parsed_certs))
         if parse_failures:
             notify("\nThe following renewal configuration files "
                "were invalid:")
             notify(_report_lines(parse_failures))
 
     disp = zope.component.getUtility(interfaces.IDisplay)
+    disp.notification("\n".join(out), pause=False, wrap=False)
 
-    disp.notification("\n".join(out), pause=False, wrap=False, fmt=fmt)
+def _describe_certs_json(parsed_certs, parse_failures):
+    """Print information about the certs we know about in json format. """
+    import json
+
+    out = {}
+    notify = out.update
+
+    if not parsed_certs and not parse_failures:
+        notify({"No certs found": "Please check config dir"})
+    else:
+        if parsed_certs:
+            notify(_report_json(parsed_certs))
+        if parse_failures:
+            notify(_report_failures_json(parse_failures))
+
+    disp = zope.component.getUtility(interfaces.IDisplay)
+    disp.notification(json.dumps(out, indent=4))
 
 def _search_lineages(cli_config, func, initial_rv):
     """Iterate func over unbroken lineages, allowing custom return conditions.

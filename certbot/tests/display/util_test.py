@@ -316,7 +316,7 @@ class MachineReadableDisplayTest(unittest.TestCase):
     def setUp(self):
         self.message = "Something"
         self.mock_stdout = mock.MagicMock()
-        self.displayer = display_util.MachineReadableDisplay(self.mock_stdout) 
+        self.displayer = display_util.MachineReadableDisplay(self.mock_stdout)
 
     def _call(self, message):
         self.displayer.notification(message)
