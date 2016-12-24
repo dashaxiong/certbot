@@ -78,12 +78,9 @@ class FileDisplay(object):
         side_frame = "-" * 79
         if wrap:
             message = _wrap_lines(message)
-        if fmt == "human_readable":
-            self.outfile.write(
-                "{line}{frame}{line}{msg}{line}{frame}{line}".format(
-                    line=os.linesep, frame=side_frame, msg=message))
-        elif fmt == "json" or fmt == "grep":
-            self.outfile.write(message + "\n")
+        self.outfile.write(
+            "{line}{frame}{line}{msg}{line}{frame}{line}".format(
+                line=os.linesep, frame=side_frame, msg=message))
         if pause:
             if self._can_interact(force_interactive):
                 six.moves.input("Press Enter to Continue")
@@ -437,12 +434,9 @@ class NoninteractiveDisplay(object):
         side_frame = "-" * 79
         if wrap:
             message = _wrap_lines(message)
-        if fmt == "human_readable":
-            self.outfile.write(
-                "{line}{frame}{line}{msg}{line}{frame}{line}".format(
-                    line=os.linesep, frame=side_frame, msg=message))
-        elif fmt == "json" or fmt == "grep":
-            self.outfile.write(message + "\n")
+        self.outfile.write(
+            "{line}{frame}{line}{msg}{line}{frame}{line}".format(
+                line=os.linesep, frame=side_frame, msg=message))
 
     def menu(self, message, choices, ok_label=None, cancel_label=None,
              help_label=None, default=None, cli_flag=None, *unused_kwargs):
