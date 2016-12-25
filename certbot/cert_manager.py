@@ -274,27 +274,6 @@ def _report_human_readable(parsed_certs):
                             cert.privkey))
     return "Found the following certs:\n".join(certinfo)
 
-def _report_failures_json(paths):
-    """Format a JSON report of problem conf files. """
-    report = []
-    for path in paths:
-        report.append({
-            "invalid_conf_file": path
-        })
-    return {"failures": report}
-
-def _report_json(parsed_certs):
-    certs = []
-    for cert in parsed_certs:
-        valid_string = _cert_validity(cert)
-        certs.append({
-            "certificate_name": cert.lineagename,
-            "domains": cert.names(),
-            "expiry_date": valid_string,
-            "certificate_path": cert.fullchain,
-            "private_key_path": cert.privkey})
-    return {"found": certs}
-
 def _describe_certs_human_readable(parsed_certs, parse_failures):
     """Print information about the certs we know about"""
     out = []
