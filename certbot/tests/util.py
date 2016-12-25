@@ -20,6 +20,17 @@ from certbot import constants
 from certbot import storage
 
 
+class MockCert(object):
+    """A mock class that can be json serialized. """
+    def __init__(self, lineagename, domains, expiry, fullchain, privkey):
+        self.lineagename = lineagename
+        self.names = lambda: domains
+        self.target_expiry = expiry
+        self.fullchain = fullchain
+        self.privkey = privkey
+        self.is_test_cert = True
+
+
 def vector_path(*names):
     """Path to a test vector."""
     return pkg_resources.resource_filename(

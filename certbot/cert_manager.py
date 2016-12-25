@@ -157,6 +157,46 @@ def find_duplicative_certs(config, domains):
 # Private Helpers
 ###################
 
+
+class BaseCertificateOutputFormatter(object):
+    """Base class for formatting output of certificate information. """
+
+    def __init__(self, parsed_certs, parse_failures):
+        self.parsed_certs = parsed_certs
+        self.parse_failures = parse_failures
+
+    def report_successes(self):
+        pass
+
+    def report_failures(self):
+        pass
+
+
+class JSONCertificateOutputFormatter(BaseCertificateOutputFormatter):
+    """Extract certificate information and format it for JSON. """
+
+    def report_successes(self):
+        """Format a JSON report of certificate information. """
+        certs = []
+        for cert in self.parsed_certs:
+            valid_string = _cert_validity(cert)
+            certs.append({
+                "certificate_name": cert.lineagename,
+                "domains": cert.names(),
+                "expiry_date": valid_string,
+                "certificate_path": cert.fullchain,
+                "private_key_path": cert.privkey})
+        return {"found": certs}
+
+    def report_failures(self):
+        """Format a JSON report of problem conf files. """
+        report = []
+        for path in self.parse_failures:
+            report.append({
+                "invalid_conf_file": path})
+        return {"failures": report}
+
+
 def _get_certname(config, verb):
     """Get certname from flag, interactively, or error out.
     """
@@ -213,7 +253,7 @@ def _report_human_readable(parsed_certs):
     return "Found the following certs:\n".join(certinfo)
 
 def _report_failures_json(paths):
-    """Format a json report of problem conf files. """
+    """Format a JSON report of problem conf files. """
     report = []
     for path in paths:
         report.append({
@@ -252,7 +292,7 @@ def _describe_certs_human_readable(parsed_certs, parse_failures):
     disp.notification("\n".join(out), pause=False, wrap=False)
 
 def _describe_certs_json(parsed_certs, parse_failures):
-    """Print information about the certs we know about in json format. """
+    """Print information about the certs we know about in JSON format. """
     import json
 
     out = {}

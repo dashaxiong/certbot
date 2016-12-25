@@ -17,6 +17,7 @@ from certbot.storage import ALL_FOUR
 from certbot.tests import storage_test
 from certbot.tests import util as test_util
 
+
 class BaseCertManagerTest(unittest.TestCase):
     """Base class for setting up Cert Manager tests.
     """
@@ -129,6 +130,11 @@ class DeleteTest(storage_test.BaseRenewableCertTest):
 class CertificatesTest(BaseCertManagerTest):
     """Tests for certbot.cert_manager.certificates
     """
+
+    @classmethod
+    def setUpClass(cls):
+        pass
+
     def _certificates(self, *args, **kwargs):
         from certbot.cert_manager import certificates
         return certificates(*args, **kwargs)
@@ -222,19 +228,7 @@ class CertificatesTest(BaseCertManagerTest):
         import datetime, pytz
         expiry = pytz.UTC.fromutc(datetime.datetime.utcnow())
 
-
-        class MockCert(object):
-            """A mock class that can be json serialized. """
-            def __init__(self, lineagename, domains, expiry, fullchain, privkey):
-                self.lineagename = lineagename
-                self.names = lambda: domains
-                self.target_expiry = expiry
-                self.fullchain = fullchain
-                self.privkey = privkey
-                self.is_test_cert = True
-
-
-        cert = MockCert("nameone", ["nameone", "nametwo"], expiry,
+        cert = test_util.MockCert("nameone", ["nameone", "nametwo"], expiry,
                 "/path/fullchain", "/path/privkey")
         parsed_certs = [cert]
         # pylint: disable=protected-access
@@ -245,6 +239,51 @@ class CertificatesTest(BaseCertManagerTest):
         except ValueError as e:
             self.fail(e)
 
+    def test_json_formatter(self):
+        from certbot import cert_manager
+        import json
+
+        import datetime, pytz
+        expiry = pytz.UTC.fromutc(datetime.datetime.utcnow())
+
+        cert = test_util.MockCert("nameone", ["nameone", "nametwo"], expiry,
+                "/path/fullchain", "/path/privkey")
+        parsed_certs = [cert]
+        # pylint: disable=protected-access
+        out = cert_manager._report_json(parsed_certs)
+        json_formatter = cert_manager.JSONCertificateOutputFormatter(
+            parsed_certs,
+            None)
+        
+        success_output = json_formatter.report_successes()
+        
+        try:
+            json_success = json.dumps(success_output)
+        except ValueError as e:
+            self.fail(e)
+        
+        self.assertTrue(cert.lineagename in json_success)
+        for name in cert.names():
+            self.assertTrue(name in json_success)
+        self.assertTrue(cert.fullchain in json_success)
+        self.assertTrue(cert.privkey in json_success)
+
+        parse_failures = ["/path/to/faliure1", "/path/to/failure2"]
+
+        json_formatter = cert_manager.JSONCertificateOutputFormatter(
+            None,
+            parse_failures)
+
+        failures_output = json_formatter.report_failures() 
+
+        try:
+            json_failures = json.dumps(failures_output)
+        except ValueError as e:
+            self.fail(e)
+
+        for path in parse_failures:
+            self.assertTrue(path in json_failures) 
+        
 
 class SearchLineagesTest(BaseCertManagerTest):
     """Tests for certbot.cert_manager._search_lineages."""
