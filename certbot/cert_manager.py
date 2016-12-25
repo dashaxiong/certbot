@@ -165,6 +165,17 @@ class BaseCertificateOutputFormatter(object):
         self.parsed_certs = parsed_certs
         self.parse_failures = parse_failures
 
+    def report(self, notify, out):
+        """Produce a report of certificate information. """
+        if not self.parsed_certs and not self.parse_failures:
+            notify(self.report_missing())
+        else:
+            if self.parsed_certs:
+                notify(self.report_successes())
+            if self.parse_failures:
+                notify(self.report_failures())
+        return out
+
     def report_successes(self):
         pass
 
@@ -174,6 +185,15 @@ class BaseCertificateOutputFormatter(object):
 
 class JSONCertificateOutputFormatter(BaseCertificateOutputFormatter):
     """Extract certificate information and format it for JSON. """
+
+    def report(self):
+        """Produce a JSON report of certificate information. """
+        import json
+        out = {}
+        notify = out.update
+        return json.dumps(super(JSONCertificateOutputFormatter, self).report(
+            notify, out),
+            indent=4)
 
     def report_successes(self):
         """Format a JSON report of certificate information. """
@@ -196,6 +216,8 @@ class JSONCertificateOutputFormatter(BaseCertificateOutputFormatter):
                 "invalid_conf_file": path})
         return {"failures": report}
 
+    def report_missing(self):
+        return {"No certs found": "Please check config dir"}
 
 def _get_certname(config, verb):
     """Get certname from flag, interactively, or error out.
@@ -293,21 +315,11 @@ def _describe_certs_human_readable(parsed_certs, parse_failures):
 
 def _describe_certs_json(parsed_certs, parse_failures):
     """Print information about the certs we know about in JSON format. """
-    import json
-
-    out = {}
-    notify = out.update
-
-    if not parsed_certs and not parse_failures:
-        notify({"No certs found": "Please check config dir"})
-    else:
-        if parsed_certs:
-            notify(_report_json(parsed_certs))
-        if parse_failures:
-            notify(_report_failures_json(parse_failures))
+    formatter = JSONCertificateOutputFormatter(parsed_certs, parse_failures)
+    out = formatter.report()
 
     disp = zope.component.getUtility(interfaces.IDisplay)
-    disp.notification(json.dumps(out, indent=4))
+    disp.notification(out)
 
 def _search_lineages(cli_config, func, initial_rv):
     """Iterate func over unbroken lineages, allowing custom return conditions.
