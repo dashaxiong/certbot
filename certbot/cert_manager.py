@@ -182,6 +182,57 @@ class BaseCertificateOutputFormatter(object):
     def report_failures(self):
         pass
 
+    def _cert_validity(self, cert):
+        now = pytz.UTC.fromutc(datetime.datetime.utcnow())
+        if cert.is_test_cert:
+            expiration_text = "INVALID: TEST CERT"
+        elif cert.target_expiry <= now:
+            expiration_text = "INVALID: EXPIRED"
+        else:
+            diff = cert.target_expiry - now
+            if diff.days == 1:
+                expiration_text = "VALID: 1 day"
+            elif diff.days < 1:
+                expiration_text = "VALID: {0} hour(s)".format(diff.seconds // 3600)
+            else:
+                expiration_text = "VALID: {0} days".format(diff.days)
+        valid_string = "{0} ({1})".format(cert.target_expiry, expiration_text)
+        return valid_string
+
+
+class HumanReadableCertOutputFormatter(BaseCertificateOutputFormatter):
+    """Extract certificate information and format it to be human readable. """
+
+    def report(self):
+        """Produce a human readable report of certificate information. """
+        out = []
+        notify = out.append
+        return super(HumanReadableCertOutputFormatter, self).report(notify, out)
+
+    def report_successes(self):
+        """Format a human readable report of certificate information. """
+        certinfo = []
+        for cert in self.parsed_certs:
+            valid_string = self._cert_validity(cert)
+            certinfo.append("  Certificate Name: {0}\n"
+                            "    Domains: {1}\n"
+                            "    Expiry Date: {2}\n"
+                            "    Certificate Path: {3}\n"
+                            "    Private Key Path: {4}".format(
+                                cert.lineagename,
+                                " ".join(cert.names()),
+                                valid_string,
+                                cert.fullchain,
+                                cert.privkey))
+        return "Found the following certs:\n".join(certinfo)
+
+    def report_failures(self):
+        """Format a results report for a category of single-line renewal outcomes"""
+        return "\nThe following renewal configuration files were invalid:  " + "\n  ".join(
+           str(path) for path in self.parse_failures)
+
+    def report_missing(self):
+        return "No certs found."
 
 class JSONCertificateOutputFormatter(BaseCertificateOutputFormatter):
     """Extract certificate information and format it for JSON. """
@@ -199,7 +250,7 @@ class JSONCertificateOutputFormatter(BaseCertificateOutputFormatter):
         """Format a JSON report of certificate information. """
         certs = []
         for cert in self.parsed_certs:
-            valid_string = _cert_validity(cert)
+            valid_string = self._cert_validity(cert)
             certs.append({
                 "certificate_name": cert.lineagename,
                 "domains": cert.names(),
@@ -236,58 +287,10 @@ def _get_certname(config, verb):
         certname = choices[index]
     return certname
 
-def _cert_validity(cert):
-    now = pytz.UTC.fromutc(datetime.datetime.utcnow())
-    if cert.is_test_cert:
-        expiration_text = "INVALID: TEST CERT"
-    elif cert.target_expiry <= now:
-        expiration_text = "INVALID: EXPIRED"
-    else:
-        diff = cert.target_expiry - now
-        if diff.days == 1:
-            expiration_text = "VALID: 1 day"
-        elif diff.days < 1:
-            expiration_text = "VALID: {0} hour(s)".format(diff.seconds // 3600)
-        else:
-            expiration_text = "VALID: {0} days".format(diff.days)
-    valid_string = "{0} ({1})".format(cert.target_expiry, expiration_text)
-    return valid_string
-
-def _report_lines(msgs):
-    """Format a results report for a category of single-line renewal outcomes"""
-    return "  " + "\n  ".join(str(msg) for msg in msgs)
-
-def _report_human_readable(parsed_certs):
-    """Format a results report for a parsed cert"""
-    certinfo = []
-    for cert in parsed_certs:
-        valid_string = _cert_validity(cert)
-        certinfo.append("  Certificate Name: {0}\n"
-                        "    Domains: {1}\n"
-                        "    Expiry Date: {2}\n"
-                        "    Certificate Path: {3}\n"
-                        "    Private Key Path: {4}".format(
-                            cert.lineagename,
-                            " ".join(cert.names()),
-                            valid_string,
-                            cert.fullchain,
-                            cert.privkey))
-    return "Found the following certs:\n".join(certinfo)
-
 def _describe_certs_human_readable(parsed_certs, parse_failures):
     """Print information about the certs we know about"""
-    out = []
-    notify = out.append
-
-    if not parsed_certs and not parse_failures:
-        notify("No certs found.")
-    else:
-        if parsed_certs:
-            notify(_report_human_readable(parsed_certs))
-        if parse_failures:
-            notify("\nThe following renewal configuration files "
-               "were invalid:")
-            notify(_report_lines(parse_failures))
+    formatter = HumanReadableCertOutputFormatter(parsed_certs, parse_failures)
+    out = formatter.report()
 
     disp = zope.component.getUtility(interfaces.IDisplay)
     disp.notification("\n".join(out), pause=False, wrap=False)
