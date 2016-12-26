@@ -157,7 +157,7 @@ class CertificatesTest(BaseCertManagerTest):
     @mock.patch('certbot.cert_manager.logger')
     @mock.patch('zope.component.getUtility')
     @mock.patch("certbot.storage.RenewableCert")
-    @mock.patch('certbot.cert_manager._report_human_readable')
+    @mock.patch('certbot.cert_manager.BaseCertificateOutputFormatter.report')
     def test_certificates_parse_success(self, mock_report, mock_renewable_cert,
         mock_utility, mock_logger):
         mock_report.return_value = ""
@@ -196,30 +196,40 @@ class CertificatesTest(BaseCertManagerTest):
         cert.is_test_cert = False
         parsed_certs = [cert]
         # pylint: disable=protected-access
-        out = cert_manager._report_human_readable(parsed_certs)
+        formatter = cert_manager.HumanReadableCertOutputFormatter(parsed_certs,
+            None)
+        out = formatter.report()
         self.assertTrue("INVALID: EXPIRED" in out)
 
         cert.target_expiry += datetime.timedelta(hours=2)
         # pylint: disable=protected-access
-        out = cert_manager._report_human_readable(parsed_certs)
+        formatter = cert_manager.HumanReadableCertOutputFormatter(parsed_certs,
+            None)
+        out = formatter.report()
         self.assertTrue('1 hour(s)' in out)
         self.assertTrue('VALID' in out and not 'INVALID' in out)
 
         cert.target_expiry += datetime.timedelta(days=1)
         # pylint: disable=protected-access
-        out = cert_manager._report_human_readable(parsed_certs)
+        formatter = cert_manager.HumanReadableCertOutputFormatter(parsed_certs,
+            None)
+        out = formatter.report()
         self.assertTrue('1 day' in out)
         self.assertFalse('under' in out)
         self.assertTrue('VALID' in out and not 'INVALID' in out)
 
         cert.target_expiry += datetime.timedelta(days=2)
         # pylint: disable=protected-access
-        out = cert_manager._report_human_readable(parsed_certs)
+        formatter = cert_manager.HumanReadableCertOutputFormatter(parsed_certs,
+            None)
+        out = formatter.report()
         self.assertTrue('3 days' in out)
         self.assertTrue('VALID' in out and not 'INVALID' in out)
 
         cert.is_test_cert = True
-        out = cert_manager._report_human_readable(parsed_certs)
+        formatter = cert_manager.HumanReadableCertOutputFormatter(parsed_certs,
+            None)
+        out = formatter.report()
         self.assertTrue('INVALID: TEST CERT' in out)
 
     def test_report_json(self):
@@ -232,7 +242,9 @@ class CertificatesTest(BaseCertManagerTest):
                 "/path/fullchain", "/path/privkey")
         parsed_certs = [cert]
         # pylint: disable=protected-access
-        out = cert_manager._report_json(parsed_certs)
+        formatter = cert_manager.JSONCertificateOutputFormatter(parsed_certs,
+            None)
+        out = formatter.report()
 
         try:
             json.dumps(out)
@@ -249,41 +261,39 @@ class CertificatesTest(BaseCertManagerTest):
         cert = test_util.MockCert("nameone", ["nameone", "nametwo"], expiry,
                 "/path/fullchain", "/path/privkey")
         parsed_certs = [cert]
-        # pylint: disable=protected-access
-        out = cert_manager._report_json(parsed_certs)
-        json_formatter = cert_manager.JSONCertificateOutputFormatter(
+        formatter = cert_manager.JSONCertificateOutputFormatter(
             parsed_certs,
             None)
-        
-        success_output = json_formatter.report_successes()
-        
+
+        out = formatter.report_successes()
+
         try:
-            json_success = json.dumps(success_output)
+            out = json.dumps(out)
         except ValueError as e:
             self.fail(e)
-        
-        self.assertTrue(cert.lineagename in json_success)
+
+        self.assertTrue(cert.lineagename in out)
         for name in cert.names():
-            self.assertTrue(name in json_success)
-        self.assertTrue(cert.fullchain in json_success)
-        self.assertTrue(cert.privkey in json_success)
+            self.assertTrue(name in out)
+        self.assertTrue(cert.fullchain in out)
+        self.assertTrue(cert.privkey in out)
 
         parse_failures = ["/path/to/faliure1", "/path/to/failure2"]
 
-        json_formatter = cert_manager.JSONCertificateOutputFormatter(
+        formatter = cert_manager.JSONCertificateOutputFormatter(
             None,
             parse_failures)
 
-        failures_output = json_formatter.report_failures() 
+        out = formatter.report_failures()
 
         try:
-            json_failures = json.dumps(failures_output)
+            out = json.dumps(out)
         except ValueError as e:
             self.fail(e)
 
         for path in parse_failures:
-            self.assertTrue(path in json_failures) 
-        
+            self.assertTrue(path in out)
+
 
 class SearchLineagesTest(BaseCertManagerTest):
     """Tests for certbot.cert_manager._search_lineages."""

@@ -86,14 +86,14 @@ def certificates(config):
     else:
         style = "human_readable"
 
-    output_in = {
-        "human_readable": _describe_certs_human_readable,
-        "json": _describe_certs_json,
+    formatter = {
+        "human_readable": HumanReadableCertOutputFormatter,
+        "json": JSONCertificateOutputFormatter,
         #"grep": _describe_certs_grep
     }
 
     # Describe all the certs
-    output_in[style](parsed_certs, parse_failures)
+    _describe_certs(formatter[style](parsed_certs, parse_failures))
 
 def delete(config):
     """Delete Certbot files associated with a certificate lineage."""
@@ -177,9 +177,15 @@ class BaseCertificateOutputFormatter(object):
         return out
 
     def report_successes(self):
+        """Stub method to be implemented by subclasses."""
         pass
 
     def report_failures(self):
+        """Stub method to be implemented by subclasses."""
+        pass
+
+    def report_missing(self):
+        """Stub method to be implemented by subclasses."""
         pass
 
     def _cert_validity(self, cert):
@@ -203,11 +209,12 @@ class BaseCertificateOutputFormatter(object):
 class HumanReadableCertOutputFormatter(BaseCertificateOutputFormatter):
     """Extract certificate information and format it to be human readable. """
 
-    def report(self):
+    def report(self):  # pylint: disable=arguments-differ
         """Produce a human readable report of certificate information. """
         out = []
         notify = out.append
-        return super(HumanReadableCertOutputFormatter, self).report(notify, out)
+        return "\n".join(super(HumanReadableCertOutputFormatter, self).report(
+            notify, out))
 
     def report_successes(self):
         """Format a human readable report of certificate information. """
@@ -224,12 +231,14 @@ class HumanReadableCertOutputFormatter(BaseCertificateOutputFormatter):
                                 valid_string,
                                 cert.fullchain,
                                 cert.privkey))
-        return "Found the following certs:\n".join(certinfo)
+            successes = "\n".join(certinfo)
+        return "Found the following certs: \n" + successes
 
     def report_failures(self):
         """Format a results report for a category of single-line renewal outcomes"""
-        return "\nThe following renewal configuration files were invalid:  " + "\n  ".join(
-           str(path) for path in self.parse_failures)
+        failures = "\n".join(str(path) for path in self.parse_failures)
+        preface = "\nThe following renewal configuration files were invalid: \n"
+        return  preface + failures
 
     def report_missing(self):
         return "No certs found."
@@ -237,7 +246,7 @@ class HumanReadableCertOutputFormatter(BaseCertificateOutputFormatter):
 class JSONCertificateOutputFormatter(BaseCertificateOutputFormatter):
     """Extract certificate information and format it for JSON. """
 
-    def report(self):
+    def report(self):  # pylint: disable=arguments-differ
         """Produce a JSON report of certificate information. """
         import json
         out = {}
@@ -287,21 +296,11 @@ def _get_certname(config, verb):
         certname = choices[index]
     return certname
 
-def _describe_certs_human_readable(parsed_certs, parse_failures):
+def _describe_certs(formatter):
     """Print information about the certs we know about"""
-    formatter = HumanReadableCertOutputFormatter(parsed_certs, parse_failures)
     out = formatter.report()
-
     disp = zope.component.getUtility(interfaces.IDisplay)
-    disp.notification("\n".join(out), pause=False, wrap=False)
-
-def _describe_certs_json(parsed_certs, parse_failures):
-    """Print information about the certs we know about in JSON format. """
-    formatter = JSONCertificateOutputFormatter(parsed_certs, parse_failures)
-    out = formatter.report()
-
-    disp = zope.component.getUtility(interfaces.IDisplay)
-    disp.notification(out)
+    disp.notification(out, pause=False, wrap=False)
 
 def _search_lineages(cli_config, func, initial_rv):
     """Iterate func over unbroken lineages, allowing custom return conditions.
