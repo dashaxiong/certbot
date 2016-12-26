@@ -23,6 +23,8 @@ from certbot import storage
 class MockCert(object):
     """A mock class that can be json serialized. """
     def __init__(self, lineagename, domains, expiry, fullchain, privkey):
+        self.cert = ""
+        self.chain = ""
         self.lineagename = lineagename
         self.names = lambda: domains
         self.target_expiry = expiry

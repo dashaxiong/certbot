@@ -248,6 +248,90 @@ class CertificatesTest(BaseCertManagerTest):
         out = get_report()
         self.assertEqual(len(re.findall("INVALID:", out)), 0)
 
+
+class FormattersTest(CertificatesTest):
+    """Tests for certbot.cert_manager.*CertOutputFormatter classes"""
+
+    @unittest.skipIf(True, "Formatter not currently connected")
+    @mock.patch('certbot.cert_manager.logger')
+    @mock.patch('zope.component.getUtility')
+    @mock.patch("certbot.storage.RenewableCert")
+    @mock.patch('certbot.cert_manager.BaseCertificateOutputFormatter.report') 
+    def test_certificates_formatters_parse_success(self, mock_report, 
+        mock_renewable_cert, mock_utility, mock_logger):
+        mock_report.return_value = ""
+        self._certificates(self.cli_config)
+        self.assertFalse(mock_logger.warning.called) #pylint: disable=no-member
+        self.assertTrue(mock_report.called)
+        self.assertTrue(mock_utility.called)
+        self.assertTrue(mock_renewable_cert.called)
+
+    @mock.patch('certbot.cert_manager.ocsp.RevocationChecker.ocsp_revoked')
+    def test_report_human_readable_formatter(self, mock_revoked):
+        mock_revoked.return_value = None
+        from certbot import cert_manager
+        import datetime, pytz
+        expiry = pytz.UTC.fromutc(datetime.datetime.utcnow())
+
+        cert = mock.MagicMock(lineagename="nameone")
+        cert.target_expiry = expiry
+        cert.names.return_value = ["nameone", "nametwo"]
+        cert.is_test_cert = False
+        parsed_certs = [cert]
+
+        # pylint: disable=protected-access
+        get_report = lambda: cert_manager._report_human_readable(mock_config, parsed_certs)
+
+        mock_config = mock.MagicMock(certname=None, lineagename=None)
+        # pylint: disable=protected-access
+        out = get_report()
+        self.assertTrue("INVALID: EXPIRED" in out)
+
+        cert.target_expiry += datetime.timedelta(hours=2)
+        # pylint: disable=protected-access
+        out = get_report()
+        self.assertTrue('1 hour(s)' in out)
+        self.assertTrue('VALID' in out and not 'INVALID' in out)
+
+        cert.target_expiry += datetime.timedelta(days=1)
+        # pylint: disable=protected-access
+        out = get_report()
+        self.assertTrue('1 day' in out)
+        self.assertFalse('under' in out)
+        self.assertTrue('VALID' in out and not 'INVALID' in out)
+
+        cert.target_expiry += datetime.timedelta(days=2)
+        # pylint: disable=protected-access
+        out = get_report()
+        self.assertTrue('3 days' in out)
+        self.assertTrue('VALID' in out and not 'INVALID' in out)
+
+        cert.is_test_cert = True
+        mock_revoked.return_value = True
+        out = get_report()
+        self.assertTrue('INVALID: TEST_CERT, REVOKED' in out)
+
+        cert = mock.MagicMock(lineagename="indescribable")
+        cert.target_expiry = expiry
+        cert.names.return_value = ["nameone", "thrice.named"]
+        cert.is_test_cert = True
+        parsed_certs.append(cert)
+
+        out = get_report()
+        self.assertEqual(len(re.findall("INVALID:", out)), 2)
+        mock_config.domains = ["thrice.named"]
+        out = get_report()
+        self.assertEqual(len(re.findall("INVALID:", out)), 1)
+        mock_config.domains = ["nameone"]
+        out = get_report()
+        self.assertEqual(len(re.findall("INVALID:", out)), 2)
+        mock_config.certname = "indescribable"
+        out = get_report()
+        self.assertEqual(len(re.findall("INVALID:", out)), 1)
+        mock_config.certname = "horror"
+        out = get_report()
+        self.assertEqual(len(re.findall("INVALID:", out)), 0)
+
     def test_report_json(self):
         from certbot import cert_manager
         import json
@@ -258,8 +342,9 @@ class CertificatesTest(BaseCertManagerTest):
                 "/path/fullchain", "/path/privkey")
         parsed_certs = [cert]
         # pylint: disable=protected-access
+        mock_config = mock.MagicMock(certname=None, lineagename=None)
         formatter = cert_manager.JSONCertificateOutputFormatter(
-            None,
+            mock_config ,
             parsed_certs,
             None)
         out = formatter.report()
@@ -279,8 +364,9 @@ class CertificatesTest(BaseCertManagerTest):
         cert = test_util.MockCert("nameone", ["nameone", "nametwo"], expiry,
                 "/path/fullchain", "/path/privkey")
         parsed_certs = [cert]
+        mock_config = mock.MagicMock(certname=None, lineagename=None)
         formatter = cert_manager.JSONCertificateOutputFormatter(
-            None,
+            mock_config ,
             parsed_certs,
             None)
 

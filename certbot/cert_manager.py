@@ -163,10 +163,11 @@ def find_duplicative_certs(config, domains):
 class BaseCertificateOutputFormatter(object):
     """Base class for formatting output of certificate information. """
 
-    def __init__(self, config, parsed_certs, parse_failures):
+    def __init__(self, config, parsed_certs=None, parse_failures=None):
         self.config = config
         self.parsed_certs = parsed_certs
         self.parse_failures = parse_failures
+        self.checker = ocsp.RevocationChecker()
 
     def report(self, notify, out):
         """Produce a report of certificate information. """
@@ -193,19 +194,27 @@ class BaseCertificateOutputFormatter(object):
 
     def _cert_validity(self, cert):
         now = pytz.UTC.fromutc(datetime.datetime.utcnow())
+
+        reasons = []
         if cert.is_test_cert:
-            expiration_text = "INVALID: TEST CERT"
-        elif cert.target_expiry <= now:
-            expiration_text = "INVALID: EXPIRED"
+            reasons.append('TEST_CERT')
+        if cert.target_expiry <= now:
+            reasons.append('EXPIRED')
+        if self.checker.ocsp_revoked(cert.cert, cert.chain):
+            reasons.append('REVOKED')
+
+        if reasons:
+            status = "INVALID: " + ", ".join(reasons)
         else:
             diff = cert.target_expiry - now
             if diff.days == 1:
-                expiration_text = "VALID: 1 day"
+                status = "VALID: 1 day"
             elif diff.days < 1:
-                expiration_text = "VALID: {0} hour(s)".format(diff.seconds // 3600)
+                status = "VALID: {0} hour(s)".format(diff.seconds // 3600)
             else:
-                expiration_text = "VALID: {0} days".format(diff.days)
-        valid_string = "{0} ({1})".format(cert.target_expiry, expiration_text)
+                status = "VALID: {0} days".format(diff.days)
+
+        valid_string = "{0} ({1})".format(cert.target_expiry, status)
         return valid_string
 
 
@@ -223,6 +232,10 @@ class HumanReadableCertOutputFormatter(BaseCertificateOutputFormatter):
         """Format a human readable report of certificate information. """
         certinfo = []
         for cert in self.parsed_certs:
+            if config.certname and cert.lineagename != config.certname:
+                continue
+            if config.domains and not set(config.domains).issubset(cert.names()):
+                continue
             valid_string = self._cert_validity(cert)
             certinfo.append("  Certificate Name: {0}\n"
                             "    Domains: {1}\n"
@@ -262,6 +275,10 @@ class JSONCertificateOutputFormatter(BaseCertificateOutputFormatter):
         """Format a JSON report of certificate information. """
         certs = []
         for cert in self.parsed_certs:
+            if self.config.certname and cert.lineagename != self.config.certname:
+                continue
+            if self.config.domains and not set(self.config.domains).issubset(cert.names()):
+                continue
             valid_string = self._cert_validity(cert)
             certs.append({
                 "certificate_name": cert.lineagename,
