@@ -421,7 +421,7 @@ class NoninteractiveDisplay(object):
             msg += "\n\n(You can set this with the {0} flag)".format(cli_flag)
         raise errors.MissingCommandlineFlag(msg)
 
-    def notification(self, message, pause=False, wrap=True):
+    def notification(self, message, pause=False, wrap=True, **unused_kwargs):
         # pylint: disable=unused-argument
         """Displays a notification without waiting for user acceptance.
 

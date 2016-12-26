@@ -258,7 +258,9 @@ class CertificatesTest(BaseCertManagerTest):
                 "/path/fullchain", "/path/privkey")
         parsed_certs = [cert]
         # pylint: disable=protected-access
-        formatter = cert_manager.JSONCertificateOutputFormatter(parsed_certs,
+        formatter = cert_manager.JSONCertificateOutputFormatter(
+            None,
+            parsed_certs,
             None)
         out = formatter.report()
 
@@ -278,6 +280,7 @@ class CertificatesTest(BaseCertManagerTest):
                 "/path/fullchain", "/path/privkey")
         parsed_certs = [cert]
         formatter = cert_manager.JSONCertificateOutputFormatter(
+            None,
             parsed_certs,
             None)
 
@@ -297,6 +300,7 @@ class CertificatesTest(BaseCertManagerTest):
         parse_failures = ["/path/to/faliure1", "/path/to/failure2"]
 
         formatter = cert_manager.JSONCertificateOutputFormatter(
+            None,
             None,
             parse_failures)
 
